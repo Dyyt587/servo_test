@@ -1,0 +1,10 @@
+{
+    "files.associations": {
+        "iterator": "cpp",
+        "main.h": "c",
+        "dfrobot_crc.h": "c",
+        "dfrobot_lidar07.h": "c",
+        "queue": "c",
+        "random": "c"
+    }
+}

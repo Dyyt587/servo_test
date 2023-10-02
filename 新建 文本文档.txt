@@ -1,0 +1,205 @@
+DFRobot_LIDAR07 :: DFRobot_LIDAR07(uint8_t type)
+{
+  distance = 0;
+  amplitude = 0;
+  version = 0;
+
+  // 初始化读取版本数据包
+  readVersionPacket = new sSendPacket_t;
+  // 初始化设置间隔数据包
+  setIntervalPacket = new sSendPacket_t;
+  // 初始化设置模式数据包
+  setModePacket = new sSendPacket_t;
+  // 初始化启动数据包
+  startPacket = new sSendPacket_t;
+  // 初始化停止数据包
+  stopPacket = new sSendPacket_t;
+  // 初始化启动滤波数据包
+  startFilterPacket = new sSendPacket_t;
+  // 初始化停止滤波数据包
+  stopFilterPacket = new sSendPacket_t;
+  // 初始化设置频率数据包
+  setFreq = new sSendPacket_t;
+  // 初始化类型
+  if(type == 0){
+    _type = LIDAR07_IIC;
+  } else{
+    _type = LIDAR07_UART;
+  }
+}
+
+DFRobot_LIDAR07 ::~DFRobot_LIDAR07()
+{
+  // 释放读取版本数据包
+  delete readVersionPacket;
+  // 释放设置间隔数据包
+  delete setIntervalPacket;
+  // 释放设置模式数据包
+  delete setModePacket;
+  // 释放启动数据包
+  delete startPacket; 
+  // 释放停止数据包
+  delete stopPacket;
+  // 释放启动过滤数据包
+  delete startFilterPacket;
+  // 释放停止过滤数据包
+  delete stopFilterPacket;
+  // 释放设置频率
+  delete setFreq;
+  // 初始化读取版本数据包
+  readVersionPacket = NULL;
+  // 初始化设置间隔数据包
+  setIntervalPacket = NULL;
+  // 初始化设置模式数据包
+  setModePacket = NULL;
+  // 初始化启动数据包
+  startPacket = NULL;
+  // 初始化停止数据包
+  stopPacket = NULL;
+  // 初始化启动过滤数据包
+  startFilterPacket = NULL;
+  // 初始化停止过滤数据包
+  stopFilterPacket = NULL; 
+  // 初始化设置频率
+  setFreq= NULL;
+}
+
+bool DFRobot_LIDAR07:: begin()
+{
+  bool ret = false;
+  uint8_t buff[12]={0}; 
+  read((void *)buff,12,0);//这里是为了清除串口缓存
+  setMeasureMode(eLidar07Single);
+  read((void *)buff,12,0);//这里是为了清除串口缓存
+  write((void *)readVersionPacket,sizeof(sSendPacket_t));
+  delay(20);
+  uint32_t crc=read((void *)buff,12,readVersionPacket->command);
+  uint32_t checkData = (uint32_t)buff[8] | ((uint32_t)buff[9]<<8) | ((uint32_t)buff[10]<<16) | ((uint32_t)buff[11]<<24);
+  if(crc==checkData){
+      readValue(buff,LIDAR07_VERSION);
+      ret = true;
+  }
+  return  ret;
+}
+
+bool DFRobot_LIDAR07:: setMeasureMode(eLIDAR07CollectMode_t mode)
+{
+  uint8_t buff[12];
+  bool ret = false;
+  if(mode==eLidar07Continuous){
+      setModePacket->data[0]=0x01;
+      uint32_t modeCrcData=0;
+      if(_type == LIDAR07_UART){
+        modeCrcData=doCrc32MPEG2Calculate((uint8_t*)setModePacket,6);
+      }else{
+        modeCrcData=doCrc32MPEG2Calculate((uint8_t*)(&(setModePacket->command)),5);
+      }
+      setModePacket->checkData[0]=modeCrcData &0xFF;
+      setModePacket->checkData[1]=(modeCrcData>>8) &0xFF;
+      setModePacket->checkData[2]=(modeCrcData>>16) &0xFF;
+      setModePacket->checkData[3]=(modeCrcData>>24) &0xFF;
+  }
+  write((void *)setModePacket,sizeof(sSendPacket_t));
+  delay(20);
+  uint32_t crc=read((void *)buff,12,setModePacket->command);
+  uint32_t checkData = (uint32_t)buff[8] | ((uint32_t)buff[9]<<8) | ((uint32_t)buff[10]<<16) | ((uint32_t)buff[11]<<24);
+  if(crc==checkData){
+      ret = true;
+  }
+  return ret;
+}
+bool DFRobot_LIDAR07::setConMeasureFreq(uint32_t frqe)
+{
+  uint8_t buff[12];
+  bool ret = false;
+  uint32_t freqCrcData=0;
+  setFreq->data[0]=frqe & 0xFF;
+  setFreq->data[1]=(frqe>>8) & 0xFF;
+  setFreq->data[2]=(frqe>>16) & 0xFF;
+  setFreq->data[3]=(frqe>>24) & 0xFF;
+  if(_type == LIDAR07_UART){
+    freqCrcData=doCrc32MPEG2Calculate((uint8_t*)setFreq,6);
+  }else{
+    freqCrcData=doCrc32MPEG2Calculate((uint8_t*)(&(setFreq->command)),5);
+  }
+  setFreq->checkData[0]=freqCrcData &0xFF;
+  setFreq->checkData[1]=(freqCrcData>>8) &0xFF;
+  setFreq->checkData[2]=(freqCrcData>>16) &0xFF;
+  setFreq->checkData[3]=(freqCrcData>>24) &0xFF;
+  write((void *)setFreq,sizeof(sSendPacket_t));
+  delay(20);
+  uint32_t crc=read((void *)buff,12,setFreq->command);
+  uint32_t checkData = (uint32_t)buff[8] | ((uint32_t)buff[9]<<8) | ((uint32_t)buff[10]<<16) | ((uint32_t)buff[11]<<24);
+  if(crc==checkData){
+      ret = true;
+  }
+  return ret;
+}
+
+void DFRobot_LIDAR07::startMeasure()
+{
+  write((void *)startPacket,sizeof(sSendPacket_t));
+  delay(20);
+}
+
+uint16_t DFRobot_LIDAR07::getDistanceMM()
+{
+  return distance;
+}
+
+uint16_t DFRobot_LIDAR07::getSignalAmplitude()
+{
+  return amplitude;
+}
+
+uint32_t DFRobot_LIDAR07:: getVersion()
+{
+  return version;
+}
+
+void DFRobot_LIDAR07::stopMeasure()
+{
+  write((void *)stopPacket,sizeof(sSendPacket_t));
+  uint8_t buf[12];
+  read((void *)buf,12,0);
+}
+
+bool DFRobot_LIDAR07::startFilter()
+{
+  uint8_t buff[12];
+  bool ret = false;
+  write((void *)startFilterPacket,sizeof(sSendPacket_t));
+  delay(20);
+  uint32_t crc=read((void *)buff,12,startFilterPacket->command);
+  uint32_t checkData = (uint32_t)buff[8] | ((uint32_t)buff[9]<<8) | ((uint32_t)buff[10]<<16) | ((uint32_t)buff[11]<<24);
+  if(crc==checkData){
+      ret = true;
+  }
+  return ret;
+}
+
+bool DFRobot_LIDAR07::stopFilter()
+{
+  uint8_t buff[12];
+  bool ret = false;
+  write((void *)stopFilterPacket,sizeof(sSendPacket_t));
+  delay(20);
+  uint32_t crc=read((void *)buff,12,stopFilterPacket->command);
+  uint32_t checkData = (uint32_t)buff[8] | ((uint32_t)buff[9]<<8) | ((uint32_t)buff[10]<<16) | ((uint32_t)buff[11]<<24);
+  if(crc==checkData){
+      ret = true;
+  }
+  return ret;
+}
+
+void DFRobot_LIDAR07::readValue(uint8_t *buff,uint8_t type)
+{
+
+  if(type == LIDAR07_VERSION){
+    version = (uint32_t)buff[4] | ((uint32_t)buff[5]<<8) | ((uint32_t)buff[6]<<16) | ((uint32_t)buff[7]<<24);
+  } else if(type == LIDAR07_MEASURE){
+    distance = (uint16_t)buff[4] | ((uint16_t)buff[5]<<8);
+    amplitude = (uint16_t)buff[8] | ((uint16_t)buff[9]<<8);
+  }
+
+}
